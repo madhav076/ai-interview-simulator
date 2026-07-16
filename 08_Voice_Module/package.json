@@ -1,0 +1,26 @@
+{
+  "name": "08_voice_module",
+  "version": "1.0.0",
+  "description": "Voice Module for the AI Interview Simulator.",
+  "main": "server.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node scratch/test_auth.js && node scratch/test_resume.js && node scratch/test_interview.js && node scratch/test_voice.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.7.4",
+    "multer": "^2.2.0"
+  }
+}
