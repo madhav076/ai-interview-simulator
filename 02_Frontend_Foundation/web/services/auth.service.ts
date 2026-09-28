@@ -1,5 +1,6 @@
 import { api } from "@/lib/axios";
 import type { User } from "@/types";
+import { removeItem } from "@/utils/storage";
 
 /** Authenticate a user with email and password. Returns token + user. */
 export async function login(
@@ -27,9 +28,13 @@ export async function register(
   return data;
 }
 
-/** Log out the current user (client-side only — clears localStorage). */
+/** Log out the current user (clears auth tokens and session cookies). */
 export async function logout(): Promise<void> {
-  // The backend has no logout endpoint; token invalidation is client-side.
+  removeItem("auth_token");
+  removeItem("auth_user");
+  if (typeof document !== "undefined") {
+    document.cookie = "auth_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+  }
   return Promise.resolve();
 }
 

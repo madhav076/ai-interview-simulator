@@ -3,11 +3,25 @@ import type { User } from "@/types";
 import { getItem, setItem, removeItem } from "@/utils/storage";
 import { api } from "@/lib/axios";
 
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+
+  const cookie = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+
+  return cookie ? decodeURIComponent(cookie.split("=").slice(1).join("=")) : null;
+}
+
+function getStoredToken(): string | null {
+  return getItem<string | null>("auth_token", null) ?? getCookie("auth_token");
+}
+
 /** Write the token to both localStorage and a browser cookie for middleware. */
 function persistToken(token: string): void {
   setItem("auth_token", token);
   if (typeof document !== "undefined") {
-    document.cookie = `auth_token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+    document.cookie = `auth_token=${encodeURIComponent(token)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
   }
 }
 
@@ -15,7 +29,7 @@ function persistToken(token: string): void {
 function clearToken(): void {
   removeItem("auth_token");
   if (typeof document !== "undefined") {
-    document.cookie = "auth_token=; path=/; max-age=0";
+    document.cookie = "auth_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
   }
 }
 
@@ -99,11 +113,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   fetchProfile: async () => {
-    const token = get().token ?? getItem<string | null>("auth_token", null);
+    const token = get().token ?? getStoredToken();
     if (!token) return;
 
     // Restore token into state if it came only from localStorage
-    if (!get().token) set({ token });
+    if (!get().token) {
+      persistToken(token);
+      set({ token });
+    }
 
     set({ isLoading: true, error: null });
     try {

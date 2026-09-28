@@ -1,5 +1,5 @@
 import { api } from "@/lib/axios";
-import type { Resume } from "@/types";
+import type { Resume, ResumeAnalysis } from "@/types";
 
 /** Shape of what the backend actually returns for a resume document. */
 type BackendResume = {
@@ -9,6 +9,9 @@ type BackendResume = {
   fileName: string;
   filePath: string;
   uploadedAt: string;
+  analysis?: ResumeAnalysis | null;
+  analysisTargetRole?: string;
+  analyzedAt?: string | null;
 };
 
 /** Normalise a backend resume document to the frontend Resume type. */
@@ -19,11 +22,14 @@ function normalise(r: BackendResume): Resume {
     // fileSize is not returned by the backend — use 0 as a safe default
     fileSize: 0,
     uploadedAt: r.uploadedAt,
+    analysis: r.analysis ?? null,
+    analysisTargetRole: r.analysisTargetRole ?? "",
+    analyzedAt: r.analyzedAt ?? null,
   };
 }
 
 /**
- * Upload a PDF resume.
+ * Upload a PDF or DOCX resume.
  * Backend: POST /api/resume/upload (multipart/form-data, field name "resume")
  */
 export async function uploadResume(file: File): Promise<Resume> {
@@ -76,4 +82,19 @@ export async function deleteResume(_id: string): Promise<void> {
  */
 export async function parseResume(_id: string): Promise<void> {
   return Promise.resolve();
+}
+
+export async function analyzeResume(
+  id: string,
+  targetJobRole: string,
+): Promise<{ resume: Resume; analysis: ResumeAnalysis }> {
+  const { data } = await api.post<{
+    resume: BackendResume;
+    analysis: ResumeAnalysis;
+  }>(`/api/resume/${id}/analyze`, { targetJobRole });
+
+  return {
+    resume: normalise(data.resume),
+    analysis: data.analysis,
+  };
 }

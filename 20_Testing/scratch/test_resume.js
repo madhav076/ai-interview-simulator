@@ -8,12 +8,22 @@ const mockResume = {
       _id: "mock_resume_id_" + Math.random().toString(36).substr(2, 9),
       ...data,
       uploadedAt: new Date(),
+      analysis: null,
+      analysisTargetRole: "",
+      analyzedAt: null,
+      save: async function () {
+        return this;
+      },
     };
     resumeDbStore.push(newResume);
     return newResume;
   },
   findOne: (query) => {
-    const userResumes = resumeDbStore.filter((r) => r.userId === query.userId);
+    const userResumes = resumeDbStore.filter((r) => {
+      const userMatches = r.userId === query.userId;
+      const idMatches = !query._id || r._id === query._id;
+      return userMatches && idMatches;
+    });
     const queryObj = {
       sort: (sortObj) => {
         const sorted = [...userResumes].sort(
@@ -49,6 +59,41 @@ const mockUser = {
 };
 require.cache[require.resolve("../src/models/User")] = {
   exports: mockUser,
+};
+
+require.cache[require.resolve("../src/services/resumeTextService")] = {
+  exports: {
+    getMimeTypeFromFileName: () => "application/pdf",
+    isSupportedResumeMimeType: (mimeType) => {
+      return [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ].includes(mimeType);
+    },
+    extractResumeText: async () =>
+      "Jane Doe frontend developer resume with React, Node.js, MongoDB, projects, internship experience, and 25% performance improvement.",
+  },
+};
+
+require.cache[require.resolve("../src/services/resumeAnalysisService")] = {
+  exports: {
+    createResumeAnalysis: async ({ targetJobRole }) => ({
+      overallScore: 82,
+      atsCompatibilityScore: 78,
+      strengths: ["Mentions React, Node.js, MongoDB, projects, and internship experience."],
+      weaknesses: ["Needs more quantified outcomes across experience bullets."],
+      missingRecommendedSkills: ["Add role-relevant testing skills if accurate."],
+      projectExperienceQuality: {
+        score: 80,
+        summary: "Projects and experience are present with some measurable impact.",
+        suggestions: ["Clarify project outcomes and technical ownership."],
+      },
+      improvementSuggestions: ["Add metrics where evidence supports them."],
+      actionPlan: ["Revise bullets to include action, method, and result."],
+      targetJobRole,
+      jobMatchScore: targetJobRole ? 76 : null,
+    }),
+  },
 };
 
 // 2. Mock multer
@@ -94,7 +139,7 @@ process.env.JWT_SECRET = "test_jwt_secret_key";
 
 // 3. Import route handler & controller
 const resumeRoutes = require("../src/routes/resumeRoutes");
-const { uploadResume, getResume } = require("../src/controllers/resumeController");
+const { uploadResume, getResume, analyzeResume } = require("../src/controllers/resumeController");
 
 // Helper to create mock response
 const mockResponse = () => {
@@ -159,7 +204,53 @@ const runTests = async () => {
     console.log("✓ TEST 3: Controller - Get resume (Not Found) passed");
   }
 
-  // TEST 4: Middleware Integration & Authorization
+  // TEST 4: Controller - Analyze resume and persist result
+  {
+    const existingResume = resumeDbStore.find((r) => r.userId === "user_123");
+    const req = {
+      user: { _id: "user_123" },
+      params: { id: existingResume._id },
+      body: { targetJobRole: "Frontend Developer" },
+    };
+    const res = mockResponse();
+    await analyzeResume(req, res);
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(res.body.message, "Resume analyzed successfully.");
+    assert.strictEqual(res.body.analysis.overallScore, 82);
+    assert.strictEqual(res.body.analysis.targetJobRole, "Frontend Developer");
+    assert.strictEqual(existingResume.analysis.overallScore, 82);
+    assert.ok(existingResume.analyzedAt);
+    console.log("✓ TEST 4: Controller - Resume analysis passed");
+  }
+
+  // TEST 5: Controller - Analyze non-existent resume (404)
+  {
+    const req = {
+      user: { _id: "user_123" },
+      params: { id: "non_existent_id" },
+      body: { targetJobRole: "Backend Developer" },
+    };
+    const res = mockResponse();
+    await analyzeResume(req, res);
+    assert.strictEqual(res.statusCode, 404);
+    assert.strictEqual(res.body.message, "Resume not found.");
+    console.log("✓ TEST 5: Controller - Analyze non-existent resume returns 404");
+  }
+
+  // TEST 6: Controller - Analyze without auth (401)
+  {
+    const req = {
+      params: { id: "some_id" },
+      body: { targetJobRole: "Full Stack Developer" },
+    };
+    const res = mockResponse();
+    await analyzeResume(req, res);
+    assert.strictEqual(res.statusCode, 401);
+    assert.strictEqual(res.body.message, "Unauthorized. Please log in.");
+    console.log("✓ TEST 6: Controller - Analyze without auth returns 401");
+  }
+
+  // TEST 7: Middleware Integration & Authorization
   {
     // Find upload route stack
     const uploadRoute = resumeRoutes.stack.find(
@@ -168,11 +259,15 @@ const runTests = async () => {
     assert.ok(uploadRoute);
 
     // Middleware stack: authMiddleware, custom multer error wrapper, uploadResume controller
-    // Let's assert that there is at least authMiddleware and the controller.
     const handlers = uploadRoute.route.stack;
-    assert.ok(handlers.length >= 3); // authMiddleware, multer wrapper, controller
+    assert.ok(handlers.length >= 3);
 
-    console.log("✓ TEST 4: Routes - Middleware integration verified");
+    const analyzeRoute = resumeRoutes.stack.find(
+      (layer) => layer.route && layer.route.path === "/:id/analyze"
+    );
+    assert.ok(analyzeRoute);
+
+    console.log("✓ TEST 7: Routes - Middleware integration verified");
   }
 
   console.log("\n--- All Resume Module Step 2 tests passed successfully! ---");

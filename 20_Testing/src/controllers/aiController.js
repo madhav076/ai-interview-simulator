@@ -51,9 +51,12 @@ const generateQuestions = async (req, res) => {
       questions,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: error.message,
-      error: error.message,
+    console.error("[AiController] Error generating questions:", error.message);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
+      message: error.message || "Failed to generate interview questions.",
+      error: error.message || "AI Service Error",
+      retryable: Boolean(error.isRetryable ?? (statusCode === 503 || statusCode === 429)),
     });
   }
 };

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node scratch/test_auth.js && node scratch/test_resume.js && node scratch/test_interview.js && node scratch/test_ai.js && node scratch/test_answer.js && node scratch/test_evaluation.js && node scratch/test_feedback.js && node scratch/test_report.js && node scratch/test_dashboard.js && node scratch/test_admin.js && node scratch/test_notification.js && node scratch/test_settings.js && node scratch/test_analytics.js && node scratch/test_health.js && node scratch/test_full_api.js"
+    "test": "node scratch/test_auth.js && node scratch/test_resume.js && node scratch/test_interview.js && node scratch/test_ai.js && node scratch/test_coding.js && node scratch/test_answer.js && node scratch/test_evaluation.js && node scratch/test_feedback.js && node scratch/test_report.js && node scratch/test_dashboard.js && node scratch/test_admin.js && node scratch/test_notification.js && node scratch/test_settings.js && node scratch/test_analytics.js && node scratch/test_health.js && node scratch/test_full_api.js"
   },
   "keywords": [],
   "author": "",
@@ -21,8 +21,10 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "mammoth": "^1.12.1",
     "mongoose": "^9.7.4",
     "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.1"
   }
 }

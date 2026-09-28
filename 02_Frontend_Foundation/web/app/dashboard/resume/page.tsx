@@ -43,8 +43,12 @@ export default function ResumePage() {
 
   /** Upload logic */
   async function uploadFile(file: File) {
-    if (file.type !== "application/pdf") {
-      setUploadError("Only PDF files are supported. Please choose a PDF.");
+    const allowedTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError("Only PDF and DOCX files are supported.");
       return;
     }
 
@@ -127,10 +131,10 @@ export default function ResumePage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="application/pdf"
+        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         className="sr-only"
         onChange={handleFileChange}
-        aria-label="Upload PDF resume"
+        aria-label="Upload resume"
       />
 
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-6 items-start">
@@ -165,7 +169,7 @@ export default function ResumePage() {
                   <p className="text-sm font-bold text-slate-700 dark:text-zinc-300">
                     Drag and drop your resume here, or click to browse
                   </p>
-                  <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Maximum file size: 10 MB • Supported: PDF only</p>
+                  <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Maximum file size: 10 MB - Supported: PDF or DOCX</p>
                   <Button
                     variant="secondary"
                     className="mt-6 text-xs py-1.5 px-4"
@@ -309,7 +313,7 @@ export default function ResumePage() {
               <CardBody className="py-8 text-center p-6 flex flex-col items-center">
                 <Sparkles className="w-8 h-8 text-slate-300 dark:text-zinc-700 mb-2" />
                 <p className="text-xs text-slate-400 dark:text-zinc-500">
-                  Submit a PDF resume to get instant ATS scores and formatting scanner advice.
+                  Submit a PDF or DOCX resume to get instant ATS scores and formatting scanner advice.
                 </p>
               </CardBody>
             </Card>

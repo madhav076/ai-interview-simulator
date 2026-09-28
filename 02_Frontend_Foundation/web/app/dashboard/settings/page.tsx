@@ -3,10 +3,26 @@
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout";
 import { Card, CardHeader, CardBody, Button } from "@/components/ui";
-import { Settings as SettingsIcon, User, Sliders, Shield, AlertCircle, Save, Check, Sun, Moon, Laptop } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import {
+  Settings as SettingsIcon,
+  User,
+  Sliders,
+  Shield,
+  AlertCircle,
+  Save,
+  Check,
+  Sun,
+  Moon,
+  Laptop,
+  LogOut,
+  UserCheck,
+} from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { useThemeStore } from "@/store/theme.store";
-import { getSettings, updateSettings, UserSettings } from "@/services/settings.service";
+import { getSettings, updateSettings } from "@/services/settings.service";
+import { logout as authServiceLogout } from "@/services/auth.service";
+import { ROUTES } from "@/utils/constants";
 import { format } from "date-fns";
 
 interface LocalSettings {
@@ -16,19 +32,21 @@ interface LocalSettings {
 }
 
 export default function SettingsPage() {
-  const { user } = useAuthStore();
-  const { theme: storeTheme, setTheme: setStoreTheme } = useThemeStore();
-  
+  const { user, logout } = useAuthStore();
+  const { setTheme: setStoreTheme } = useThemeStore();
+
   const [settings, setSettings] = useState<LocalSettings>({
     theme: "system",
     preferredLanguage: "English",
     interviewDifficulty: "Medium",
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -59,7 +77,7 @@ export default function SettingsPage() {
       setSaving(true);
       setError("");
       setSuccessMsg("");
-      
+
       // Map theme value compatible with backend (database supports light/dark only)
       const apiTheme = settings.theme === "system" ? "dark" : settings.theme;
       await updateSettings({
@@ -67,7 +85,7 @@ export default function SettingsPage() {
         preferredLanguage: settings.preferredLanguage,
         interviewDifficulty: settings.interviewDifficulty,
       });
-      
+
       setSuccessMsg("Settings saved successfully.");
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (err: unknown) {
@@ -81,6 +99,22 @@ export default function SettingsPage() {
   const handleThemeChange = (newTheme: "light" | "dark" | "system") => {
     setSettings((prev) => ({ ...prev, theme: newTheme }));
     setStoreTheme(newTheme);
+  };
+
+  const handleLogoutConfirm = async () => {
+    try {
+      setIsLoggingOut(true);
+      // Run service logout cleanup
+      await authServiceLogout();
+      // Run Zustand store logout (clears state, localStorage, and cookie)
+      logout();
+      // Hard redirect to Login page to wipe client caches & trigger middleware
+      window.location.replace(`${ROUTES.LOGIN}?logged_out=true`);
+    } catch {
+      // Fallback in case of any issues
+      logout();
+      window.location.replace(`${ROUTES.LOGIN}?logged_out=true`);
+    }
   };
 
   if (loading) {
@@ -288,13 +322,13 @@ export default function SettingsPage() {
         </CardBody>
       </Card>
 
-      {/* Account Settings */}
-      <Card className="mt-6 mb-8">
+      {/* Security Settings */}
+      <Card className="mt-6">
         <CardHeader>
           <div className="flex items-center gap-2.5">
             <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             <h2 className="text-sm font-bold text-slate-900 dark:text-zinc-100">
-              Account &amp; Security
+              Security
             </h2>
           </div>
         </CardHeader>
@@ -315,6 +349,85 @@ export default function SettingsPage() {
           </div>
         </CardBody>
       </Card>
+
+      {/* Account Section */}
+      <Card className="mt-6 mb-8 border-slate-200 dark:border-zinc-800">
+        <CardHeader>
+          <div className="flex items-center gap-2.5">
+            <UserCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <h2 className="text-sm font-bold text-slate-900 dark:text-zinc-100">
+              Account
+            </h2>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-red-200/60 dark:border-red-900/30 bg-red-50/30 dark:bg-red-950/10">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <LogOut className="w-4 h-4" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100">
+                  Logout
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                Sign out of your account on this device.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsLogoutModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg border border-red-200 dark:border-red-900/50 bg-white dark:bg-zinc-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-300 dark:hover:border-red-800 transition-all duration-200 active:scale-[0.98] focus:ring-2 focus:ring-red-500/20 focus:outline-none shadow-sm cursor-pointer shrink-0"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Logout
+            </button>
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        isOpen={isLogoutModalOpen}
+        onClose={() => {
+          if (!isLoggingOut) setIsLogoutModalOpen(false);
+        }}
+        title="Confirm Logout"
+        body={
+          <div className="space-y-2">
+            <p className="text-sm text-slate-700 dark:text-zinc-200 font-medium">
+              Are you sure you want to logout?
+            </p>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Sign out of your account on this device. You will need to log back in to access your interview dashboard.
+            </p>
+          </div>
+        }
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button
+              variant="outline"
+              disabled={isLoggingOut}
+              onClick={() => setIsLogoutModalOpen(false)}
+              className="text-xs py-1.5 px-3.5"
+            >
+              Cancel
+            </Button>
+            <button
+              type="button"
+              disabled={isLoggingOut}
+              onClick={handleLogoutConfirm}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-white transition-all duration-200 active:scale-[0.98] focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-950 focus:outline-none shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              {isLoggingOut ? (
+                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+              ) : (
+                <LogOut className="w-3.5 h-3.5" />
+              )}
+              Logout
+            </button>
+          </div>
+        }
+      />
     </DashboardLayout>
   );
 }

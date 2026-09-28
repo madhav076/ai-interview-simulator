@@ -58,9 +58,12 @@ const createCodingInterview = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      message: error.message,
-      error: error.message,
+    console.error("[CodingController] Error creating coding interview:", error.message);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
+      message: error.message || "Failed to create coding interview.",
+      error: error.message || "AI Service Error",
+      retryable: Boolean(error.isRetryable ?? (statusCode === 503 || statusCode === 429)),
     });
   }
 };

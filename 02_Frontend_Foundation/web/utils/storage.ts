@@ -3,7 +3,13 @@ export function getItem<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
     const item = window.localStorage.getItem(key);
-    return item !== null ? (JSON.parse(item) as T) : fallback;
+    if (item === null) return fallback;
+
+    try {
+      return JSON.parse(item) as T;
+    } catch {
+      return item as T;
+    }
   } catch {
     console.warn(`Error reading localStorage key "${key}"`);
     return fallback;

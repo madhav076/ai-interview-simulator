@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   FileText,
+  ScanSearch,
   MessageSquare,
   Code,
   FileBarChart,
@@ -16,6 +17,7 @@ import { NavItem } from "@/components/navigation";
 const sidebarItems = [
   { href: "/dashboard", icon: <LayoutDashboard size={16} />, label: "Dashboard" },
   { href: "/dashboard/resume", icon: <FileText size={16} />, label: "Resume" },
+  { href: "/dashboard/resume-analysis", icon: <ScanSearch size={16} />, label: "Resume Analysis" },
   {
     href: "/dashboard/ai-interview",
     icon: <MessageSquare size={16} />,

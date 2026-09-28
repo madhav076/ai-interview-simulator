@@ -1,17 +1,19 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, Suspense, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { ROUTES } from "@/utils/constants";
 
-export default function LoginPage() {
+function LoginForm() {
   const { login, isLoading, error, clearError } = useAuthStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isLoggedOut = searchParams.get("logged_out") === "true";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,26 +43,33 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-zinc-950 px-4 transition-colors duration-300">
       <div className="w-full max-w-sm">
         {/* Logo / Title */}
         <div className="mb-8 text-center">
-          <span className="inline-flex h-12 w-12 items-center justify-center rounded-md bg-sky-700 text-lg font-bold text-white">
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 dark:bg-indigo-500 text-lg font-bold text-white shadow-sm shadow-indigo-500/20">
             AI
           </span>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-950">
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-950 dark:text-zinc-50">
             Sign in to your account
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
             Don&apos;t have an account?{" "}
             <Link
               href={ROUTES.REGISTER}
-              className="font-medium text-sky-700 hover:text-sky-800"
+              className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
             >
               Register
             </Link>
           </p>
         </div>
+
+        {/* Success alert on logout */}
+        {isLoggedOut && !error && (
+          <Alert variant="success" className="mb-4">
+            You have been logged out successfully.
+          </Alert>
+        )}
 
         {/* Error alert from the store */}
         {error && (
@@ -101,5 +110,19 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-zinc-950">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

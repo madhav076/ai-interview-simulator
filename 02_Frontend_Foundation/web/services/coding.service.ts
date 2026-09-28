@@ -27,12 +27,15 @@ export async function createCodingInterview(
   difficulty: "Easy" | "Medium" | "Hard",
   numberOfQuestions: number
 ): Promise<CodingInterviewRecord> {
-  const { data } = await api.post<{ codingInterview: any }>(
+  const { data } = await api.post<{ codingInterview?: any; message?: string }>(
     "/api/coding/create",
     { programmingLanguage, difficulty, numberOfQuestions }
   );
 
   const raw = data.codingInterview;
+  if (!raw) {
+    throw new Error(data.message || "Unable to initialize coding assessment.");
+  }
   return {
     id: raw.id ?? raw._id,
     title: raw.title,

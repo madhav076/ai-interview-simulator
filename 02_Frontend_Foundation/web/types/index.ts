@@ -16,6 +16,26 @@ export type Resume = {
   fileSize: number;
   uploadedAt: string;
   parsedData?: Record<string, unknown>;
+  analysis?: ResumeAnalysis | null;
+  analysisTargetRole?: string;
+  analyzedAt?: string | null;
+};
+
+export type ResumeAnalysis = {
+  overallScore: number;
+  atsCompatibilityScore: number;
+  strengths: string[];
+  weaknesses: string[];
+  missingRecommendedSkills: string[];
+  projectExperienceQuality: {
+    score: number;
+    summary: string;
+    suggestions: string[];
+  };
+  improvementSuggestions: string[];
+  actionPlan: string[];
+  targetJobRole: string;
+  jobMatchScore: number | null;
 };
 
 // ─── Interview Types ─────────────────────────────────────

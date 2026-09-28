@@ -10,7 +10,7 @@ import {
   Spinner,
   Alert,
 } from "@/components/ui";
-import { Code, CheckCircle, Play, Save, ChevronLeft, ChevronRight, RefreshCw, Layers, AlertCircle, Info, Terminal } from "lucide-react";
+import { Code, CheckCircle, Play, Save, ChevronLeft, ChevronRight, RefreshCw, AlertCircle, Info, Terminal } from "lucide-react";
 import {
   createCodingInterview,
   submitCodingSolution,
@@ -24,6 +24,44 @@ const DIFFICULTIES = ["Easy", "Medium", "Hard"] as const;
 
 type DifficultyType = (typeof DIFFICULTIES)[number];
 
+function sanitizeErrorMessage(err: unknown): string {
+  if (!err) return "Failed to start coding interview. Please try again.";
+  let msg = "";
+  if (typeof err === "object" && err !== null) {
+    const axiosErr = err as { response?: { data?: { message?: string; error?: string } }; message?: string };
+    msg = axiosErr.response?.data?.message || axiosErr.response?.data?.error || axiosErr.message || "";
+  } else {
+    msg = String(err);
+  }
+
+  // Defensively parse stringified JSON if raw provider error payload was present
+  if (msg.trim().startsWith("{") && msg.trim().endsWith("}")) {
+    try {
+      const parsed = JSON.parse(msg.trim());
+      if (parsed?.error?.message) {
+        msg = parsed.error.message;
+      } else if (parsed?.message) {
+        msg = parsed.message;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const lower = msg.toLowerCase();
+  if (lower.includes("503") || lower.includes("unavailable") || lower.includes("high demand") || lower.includes("busy")) {
+    return "The AI service is temporarily busy due to high demand. Please try again in a few moments.";
+  }
+  if (lower.includes("429") || lower.includes("rate limit") || lower.includes("quota") || lower.includes("resource_exhausted")) {
+    return "AI service request limit reached. Please wait a moment and try again.";
+  }
+  if (lower.includes("timeout") || lower.includes("fetch failed") || lower.includes("network")) {
+    return "The connection timed out while generating challenges. Please try again.";
+  }
+
+  return msg.length > 250 ? "AI service is temporarily busy. Please try again." : msg;
+}
+
 export default function CodingInterviewPage() {
   // View states: 'setup' | 'generating' | 'session' | 'complete'
   const [view, setView] = useState<"setup" | "generating" | "session" | "complete">("setup");
@@ -33,6 +71,8 @@ export default function CodingInterviewPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyType>("Medium");
   const [numQuestions, setNumQuestions] = useState(1);
   const [setupError, setSetupError] = useState<string | null>(null);
+  const [generatingMessage, setGeneratingMessage] = useState("Designing test suites and compiling starter boilerplate code templates...");
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // Active session states
   const [codingInterview, setCodingInterview] = useState<CodingInterviewRecord | null>(null);
@@ -55,29 +95,47 @@ export default function CodingInterviewPage() {
 
   const currentChallenge: CodingQuestion | undefined = questions[currentIndex];
 
-  // Action: Start Interview
+  // Action: Start Interview with auto-retry feedback and fallback
   const handleStartInterview = async () => {
     setView("generating");
     setSetupError(null);
-    try {
-      const result = await createCodingInterview(
-        selectedLanguage,
-        selectedDifficulty,
-        numQuestions
-      );
+    setIsRetrying(false);
+    setGeneratingMessage("Designing test suites and compiling starter boilerplate code templates...");
 
-      setCodingInterview(result);
-      setQuestions(result.questions);
-      setCurrentIndex(0);
-      setEditorCode(result.questions[0]?.codeTemplate || "");
-      setSubmittedSet(new Set());
-      setView("session");
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } }; message?: string };
-      setSetupError(
-        error?.response?.data?.message || error?.message || "Failed to start coding interview."
-      );
-      setView("setup");
+    const maxFrontendAttempts = 2;
+    for (let attempt = 1; attempt <= maxFrontendAttempts; attempt++) {
+      try {
+        if (attempt > 1) {
+          setIsRetrying(true);
+          setGeneratingMessage("AI service is temporarily busy. Retrying...");
+        }
+
+        const result = await createCodingInterview(
+          selectedLanguage,
+          selectedDifficulty,
+          numQuestions
+        );
+
+        setCodingInterview(result);
+        setQuestions(result.questions);
+        setCurrentIndex(0);
+        setEditorCode(result.questions[0]?.codeTemplate || "");
+        setSubmittedSet(new Set());
+        setIsRetrying(false);
+        setView("session");
+        return;
+      } catch (err: unknown) {
+        console.warn(`[CodingInterviewPage] Generation attempt ${attempt} failed:`, err);
+        if (attempt < maxFrontendAttempts) {
+          setIsRetrying(true);
+          setGeneratingMessage("AI service is temporarily busy. Retrying...");
+          await new Promise((res) => setTimeout(res, 2000));
+        } else {
+          setIsRetrying(false);
+          setSetupError(sanitizeErrorMessage(err));
+          setView("setup");
+        }
+      }
     }
   };
 
@@ -197,7 +255,20 @@ export default function CodingInterviewPage() {
         <div className="mt-8 space-y-6 max-w-2xl animate-[fade-in_0.3s_ease-out]">
           <Card>
             <CardBody className="space-y-6 p-6">
-              {setupError && <Alert variant="error">{setupError}</Alert>}
+              {setupError && (
+                <div className="space-y-3">
+                  <Alert variant="error">{setupError}</Alert>
+                  <div className="flex justify-start">
+                    <Button
+                      variant="outline"
+                      onClick={handleStartInterview}
+                      className="gap-2 px-4 py-1.5 text-xs text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
+                    >
+                      <RefreshCw size={13} /> Try Again
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Language Selection */}
               <div className="grid gap-2">
@@ -279,10 +350,10 @@ export default function CodingInterviewPage() {
             <Code className="w-8 h-8" />
           </div>
           <h2 className="text-lg font-bold text-slate-900 dark:text-zinc-100 mt-2">
-            Generating challenges using Gemini AI...
+            {isRetrying ? "AI service is temporarily busy. Retrying..." : "Generating challenges using Gemini AI..."}
           </h2>
           <p className="text-xs text-slate-400 dark:text-zinc-500 max-w-xs leading-relaxed">
-            Designing test suites and compiling starter boilerplate code templates for {selectedLanguage} ({selectedDifficulty}).
+            {generatingMessage}
           </p>
         </div>
       )}
@@ -389,7 +460,9 @@ export default function CodingInterviewPage() {
                       <span className="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
                       <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
                     </div>
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">index.{selectedLanguage === "Python" ? "py" : selectedLanguage === "Java" ? "java" : "js"}</span>
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">
+                      {selectedLanguage === "Python" ? "solution.py" : selectedLanguage === "TypeScript" ? "solution.ts" : selectedLanguage === "Java" ? "Solution.java" : "solution.js"}
+                    </span>
                   </div>
                   
                   <div className="flex min-h-[350px]">

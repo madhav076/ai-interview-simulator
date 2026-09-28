@@ -1,8 +1,9 @@
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
-const { uploadResume, getResume } = require("../controllers/resumeController");
+const { uploadResume, getResume, analyzeResume } = require("../controllers/resumeController");
 const authMiddleware = require("../middleware/authMiddleware");
+const { isSupportedResumeMimeType } = require("../services/resumeTextService");
 
 const router = express.Router();
 
@@ -17,12 +18,12 @@ const storage = multer.diskStorage({
   },
 });
 
-// Configure file filter (only allow PDF)
+// Configure file filter (allow PDF and DOCX resumes)
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === "application/pdf") {
+  if (isSupportedResumeMimeType(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Only PDF files are allowed!"), false);
+    cb(new Error("Only PDF and DOCX files are allowed!"), false);
   }
 };
 
@@ -53,5 +54,8 @@ router.post(
 
 // Route to get the user's latest uploaded resume (Requires Authentication)
 router.get("/", authMiddleware, getResume);
+
+// Route to analyze an uploaded resume with AI (Requires Authentication)
+router.post("/:id/analyze", authMiddleware, analyzeResume);
 
 module.exports = router;
